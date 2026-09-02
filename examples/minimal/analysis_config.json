@@ -1,0 +1,30 @@
+{
+  "project_name": "synthetic-mouse-cbc-example",
+  "animal_registry": "animal_registry.csv",
+  "sample_dilutions": "sample_dilutions.csv",
+  "baseline_timepoint": "D0",
+  "animal_id_mode": "cage_tag_concat",
+  "max_tag_number": 5,
+  "group_order": ["PBS", "Drug"],
+  "death_date_inclusive": true,
+  "percent_mode": "percent_of_baseline",
+  "sample_id_column": "样本编号",
+  "date_column": "日期",
+  "excluded_sample_ids": ["Background"],
+  "metrics": ["WBC", "Neu#", "Lym#", "RBC", "HGB", "PLT"],
+  "timepoints": [
+    {
+      "label": "D0",
+      "day": 0,
+      "collection_date": "2026-01-01",
+      "sources": ["raw/D0.csv"]
+    },
+    {
+      "label": "D1",
+      "day": 1,
+      "collection_date": "2026-01-02",
+      "sources": ["raw/D1.csv"]
+    }
+  ]
+}
+
