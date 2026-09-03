@@ -53,7 +53,9 @@
 
 相对路径以配置文件所在目录为基准。每个时间点可以用 `source` 指定一个文件，或用 `sources` 指定多个文件。`collection_date` 可留空；只有当该时间点原始行的 `日期` 能唯一解析为同一天时，脚本才会自动推断。
 
-`group_order` 可省略或设为空数组，此时按初始动物表中组别首次出现的顺序输出。若设置，必须完整且不重复地列出登记表中的所有组；它只改变 `group_summary.csv` 和 GraphPad 组块顺序，不改变组内动物顺序。
+`group_order` 可省略或设为空数组，此时按初始动物表中组别首次出现的顺序输出。若设置，必须完整且不重复地列出登记表中的所有组；它只改变 `group_summary.csv` 和 GraphPad 组块顺序，不改变组内动物顺序。不得自动按字母排序或沿用其他项目的顺序。
+
+用户也可在单次运行时添加 `--group-order "PBS,XJ,PB2,CD34"`。命令行值覆盖配置中的 `group_order`，且只对本次运行生效。有效顺序及其来源记录在 `run_manifest.json` 的 `group_order` 和 `group_order_source` 字段中。
 
 `sample_dilutions` 可省略或留空，表示本次没有需要校正的稀释记录；若指定文件，按 [dilution-correction.md](dilution-correction.md) 读取。新建项目模板会同时创建只有表头的 `sample_dilutions.csv`，无稀释时保持其为空即可。
 
@@ -92,7 +94,7 @@
 | `<metric>_copy_ready.csv` | 与宽表相同的值和百分比，但省略状态列，便于粘贴到现有表格 |
 | `graphpad_<metric>.tsv` | 每个指标一个按时间、组别和动物重复子列排列的 Prism XY 百分比表 |
 | `qc_issues.csv` | 错配、缺失、重复、基线和日期问题 |
-| `run_manifest.json` | 配置快照、公式、输入哈希和计数 |
+| `run_manifest.json` | 配置快照、有效 GraphPad 组序及来源、公式、输入哈希和计数 |
 
 `results_long.csv` 同时包含 `raw_value`、`dilution_factor`、`corrected_value` 和兼容字段 `value`；其中 `value` 等于 `corrected_value`。宽表的固定列为笼号、耳标、动物 ID、分组、备注和死亡日期。D0 有校正后的 `value/status`；后续时间点有校正后的 `value/pct_D0/status`。审计产物中的状态列不可省略或仅用颜色代替；`<metric>_copy_ready.csv` 是专门的无状态复制版，状态仍可在 `results_long.csv`、`<metric>_wide.csv` 和 `qc_issues.csv` 中追溯。
 

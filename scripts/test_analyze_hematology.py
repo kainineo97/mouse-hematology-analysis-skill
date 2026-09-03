@@ -21,6 +21,7 @@ from analyze_hematology import (
     UserInputError,
     build_graphpad_rows,
     load_dilutions,
+    main as analyze_main,
     run_analysis,
 )
 from init_project import main as init_project_main
@@ -261,6 +262,7 @@ class HematologyAnalysisTests(unittest.TestCase):
                 manifest["metrics"][0]["copy_ready_file"], "PLT_copy_ready.csv"
             )
             self.assertEqual(manifest["group_order"], ["Cells", "PBS", "Drug"])
+            self.assertEqual(manifest["group_order_source"], "config")
 
     def test_graphpad_single_timepoint_has_one_data_row_and_pads_groups(self) -> None:
         animals = [
@@ -299,6 +301,35 @@ class HematologyAnalysisTests(unittest.TestCase):
                 "",
             ],
         )
+
+    def test_run_group_order_override_controls_graphpad_left_to_right_order(self) -> None:
+        with workspace_temporary_directory() as temp_dir:
+            output = Path(temp_dir) / "output"
+            example_root = Path(__file__).resolve().parents[1] / "examples" / "minimal"
+
+            exit_code = analyze_main(
+                [
+                    "--config",
+                    str(example_root / "analysis_config.json"),
+                    "--output-dir",
+                    str(output),
+                    "--group-order",
+                    "Drug,PBS",
+                ]
+            )
+            self.assertEqual(exit_code, 0)
+            manifest = json.loads(
+                (output / "run_manifest.json").read_text(encoding="utf-8")
+            )
+
+            with (output / "graphpad_PLT.tsv").open(
+                "r", encoding="utf-8-sig", newline=""
+            ) as handle:
+                rows = list(csv.reader(handle, delimiter="\t"))
+            self.assertEqual(rows[0], ["Time (days)", "Drug", "", "PBS", ""])
+            self.assertEqual(rows[1], ["X", "11", "21", "10", "20"])
+            self.assertEqual(manifest["group_order"], ["Drug", "PBS"])
+            self.assertEqual(manifest["group_order_source"], "command_line")
 
     def test_dilution_factor_rejects_ratio_notation(self) -> None:
         with workspace_temporary_directory() as temp_dir:

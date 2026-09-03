@@ -1,4 +1,4 @@
 interface:
   display_name: "Mouse Hematology Analysis"
-  short_description: "Analyze longitudinal mouse CBC data with D0 normalization"
-  default_prompt: "Use $mouse-hematology-analysis to analyze my mouse CBC exports across timepoints."
+  short_description: "Analyze mouse CBC data with configurable Prism group order"
+  default_prompt: "Use $mouse-hematology-analysis to analyze my mouse CBC exports across timepoints and arrange the GraphPad groups in my requested left-to-right order."

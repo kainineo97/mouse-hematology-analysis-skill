@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 PCT_QUANTUM = Decimal("0.01")
 
 METRIC_ALIASES: "OrderedDict[str, str]" = OrderedDict(
@@ -1212,6 +1212,18 @@ def parse_group_order(config: dict[str, Any], animals: list[Animal]) -> list[str
     return list(build_group_map(animals, requested))
 
 
+def parse_group_order_option(value: str) -> list[str]:
+    """Parse a comma-separated CLI group order before registry validation."""
+    groups = [normalize_text(item) for item in value.split(",")]
+    if not groups or any(not group for group in groups):
+        raise argparse.ArgumentTypeError(
+            "group order must be a comma-separated list without blank names"
+        )
+    if len(groups) != len(set(groups)):
+        raise argparse.ArgumentTypeError("group order cannot contain duplicate names")
+    return groups
+
+
 def build_group_summary(
     animals: list[Animal], group_order: list[str] | None = None
 ) -> list[dict[str, Any]]:
@@ -1394,14 +1406,27 @@ def check_output_collisions(output_dir: Path, metrics: list[MetricSpec], overwri
         )
 
 
-def run_analysis(config_path: Path, output_dir: Path, *, overwrite: bool) -> tuple[dict[str, Any], int]:
+def run_analysis(
+    config_path: Path,
+    output_dir: Path,
+    *,
+    overwrite: bool,
+    group_order_override: list[str] | None = None,
+) -> tuple[dict[str, Any], int]:
     config_path = config_path.expanduser().resolve()
     config = load_json(config_path)
     base_dir = config_path.parent
     registry_path = resolve_path(base_dir, config.get("animal_registry"), field="animal_registry")
     registry_table = read_csv_table(registry_path)
     animals = read_registry(registry_table, config)
-    group_order = parse_group_order(config, animals)
+    if group_order_override is None:
+        group_order = parse_group_order(config, animals)
+        group_order_source = (
+            "config" if config.get("group_order") not in (None, []) else "registry"
+        )
+    else:
+        group_order = list(build_group_map(animals, group_order_override))
+        group_order_source = "command_line"
     metrics = build_metric_specs(config.get("metrics", []))
     issues: list[dict[str, str]] = []
     timepoints, raw_tables, source_values = load_timepoints(
@@ -1576,6 +1601,7 @@ def run_analysis(config_path: Path, output_dir: Path, *, overwrite: bool) -> tup
         },
         "death_date_inclusive": death_date_inclusive,
         "group_order": group_order,
+        "group_order_source": group_order_source,
         "metrics": [
             {
                 "requested": metric.requested,
@@ -1674,6 +1700,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output-dir", type=Path, help="output directory for analysis mode")
     parser.add_argument(
+        "--group-order",
+        type=parse_group_order_option,
+        metavar="GROUP1,GROUP2,...",
+        help=(
+            "left-to-right GraphPad group order for this run; overrides config group_order "
+            "and must list every registry group exactly once"
+        ),
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="overwrite only this script's known output files",
@@ -1692,11 +1727,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.list_metrics:
             if args.output_dir:
                 raise UserInputError("--output-dir is not used with --list-metrics")
+            if args.group_order is not None:
+                raise UserInputError("--group-order is not used with --list-metrics")
             return list_metrics(args.list_metrics)
         if args.output_dir is None:
             raise UserInputError("--output-dir is required with --config")
         manifest, error_count = run_analysis(
-            args.config, args.output_dir, overwrite=args.overwrite
+            args.config,
+            args.output_dir,
+            overwrite=args.overwrite,
+            group_order_override=args.group_order,
         )
         counts = manifest["counts"]
         print(f"Output: {args.output_dir.expanduser().resolve()}")
@@ -1707,6 +1747,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"Status counts: {counts['status']}")
         print(f"QC severity counts: {counts['qc_severity']}")
+        print(
+            "GraphPad group order: "
+            + " | ".join(manifest["group_order"])
+            + f" ({manifest['group_order_source']})"
+        )
         if args.strict and error_count:
             print(
                 f"Strict mode: {error_count} QC ERROR issue(s) require resolution.",
