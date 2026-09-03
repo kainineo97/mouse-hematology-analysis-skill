@@ -10,7 +10,7 @@ A reusable Codex skill for organizing longitudinal complete blood count (CBC) da
 - Calculates `%D0 = corrected_current / corrected_D0 × 100` by default.
 - Distinguishes `DEAD`, `MISSING_SAMPLE`, `MISSING_METRIC`, duplicate samples, non-numeric values, and post-death measurements.
 - Produces both audit-oriented wide tables and status-free `copy_ready` tables.
-- Produces one Prism XY table per metric, with configurable group order and stable animal replicate columns across timepoints.
+- Produces one Prism XY table per metric, with a user-defined left-to-right group order and stable animal replicate columns across timepoints.
 - Preserves input hashes, source locations, raw values, dilution factors, corrected values, and QC records for traceability.
 - Reads UTF-8, UTF-8 with BOM, and GB18030 CSV exports.
 
@@ -20,6 +20,8 @@ This project performs experimental data organization only. It does not provide c
 
 ```text
 mouse-hematology-analysis/
+├── README.md
+├── LICENSE
 ├── SKILL.md
 ├── agents/
 │   └── openai.yaml
@@ -84,6 +86,7 @@ Run the analysis:
 python scripts/analyze_hematology.py \
   --config my-study/analysis_config.json \
   --output-dir my-study/output \
+  --group-order "PBS,XJ,PB2,CD34" \
   --strict
 ```
 
@@ -100,7 +103,7 @@ python scripts/analyze_hematology.py \
 
 Each analysis project uses:
 
-1. `analysis_config.json` — timepoints, source files, metrics, baseline, matching rules, and optional group order.
+1. `analysis_config.json` — timepoints, source files, metrics, baseline, matching rules, and an optional left-to-right GraphPad group order.
 2. `animal_registry.csv` — one row per animal, including cage, tag, group, optional notes, and optional death date.
 3. Analyzer-exported CSV files — one or more files per timepoint.
 4. `sample_dilutions.csv` — optional dilution records; leave it with only the header when no samples were diluted.
@@ -113,13 +116,15 @@ The initializer creates templates for the first, second, and fourth files withou
 {
   "baseline_timepoint": "D0",
   "percent_mode": "percent_of_baseline",
-  "group_order": ["PBS", "Drug"],
+  "group_order": ["PBS", "XJ", "PB2", "CD34"],
   "metrics": ["WBC", "Neu#", "Lym#", "RBC", "HGB", "PLT"]
 }
 ```
 
-- Omit `group_order` or set it to `[]` to use the order in which groups first appear in the animal registry.
+- Set `group_order` to the desired left-to-right GraphPad dataset order. A user instruction such as `PBS → XJ → PB2 → CD34` maps directly to `["PBS", "XJ", "PB2", "CD34"]`.
+- Omit `group_order` or set it to `[]` to use the order in which groups first appear in the animal registry. The workflow never sorts groups alphabetically or reuses another study's order.
 - When supplied, `group_order` must list every registry group exactly once. It changes group-summary and GraphPad block order without changing animal order within each group.
+- For a one-off override without editing JSON, add `--group-order "PBS,XJ,PB2,CD34"`; the effective order and whether it came from the registry, config, or command line are recorded in `run_manifest.json`.
 - `percent_mode` defaults to `percent_of_baseline`. The alternative `percent_change` calculates `(current - baseline) / baseline × 100`.
 - `death_date_inclusive` defaults to `true`, meaning that a collection date equal to the recorded death date is treated as post-death. Change this only when the experimental record supports a different boundary.
 
@@ -163,6 +168,8 @@ Each `graphpad_<metric>.tsv` contains:
 - the same replicate width for every group, padded with blank columns where needed;
 - numeric `%D0` values or blank cells only.
 
+Dataset blocks appear from left to right in the effective user-selected order. Before pasting, verify the first TSV row against `run_manifest.json`.
+
 Missing, invalid, duplicated, post-death, or non-normalizable observations remain blank rather than being written as `0`, `NA`, or an imputed value. A single configured timepoint produces one data row; multiple timepoints produce one row each in configuration order.
 
 ## Tests
@@ -179,5 +186,7 @@ The tests cover longitudinal matching, GB18030 input, dilution correction, D0 no
 
 - Do not commit real experimental exports, identifying local paths, or generated analysis outputs to a public repository.
 - Everything under `examples/minimal/` is synthetic and is included only to demonstrate and validate the workflow.
-- This repository does not currently include an open-source license. The repository owner should select and add an appropriate license before public redistribution.
 
+## License
+
+This project is released under the [MIT License](LICENSE).

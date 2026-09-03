@@ -14,7 +14,7 @@ description: 处理小鼠或其他实验动物血常规分析仪导出的纵向 
 - 初始动物表：每只动物的 `cage`、`tag`、`group`，以及可选的 `animal_id`、`notes`、`death_date`。
 - 时间点：标签、采集日期和对应的一个或多个原始 CSV。
 - 要分析的指标，可多选；优先使用分析仪原始表头或脚本列出的短别名。
-- GraphPad 组块顺序。用户未指定时按初始动物表中组别首次出现的顺序；指定时记录为 `group_order`，且必须完整列出所有组。
+- GraphPad 组块从左到右的顺序（用户有时称为“样品顺序”）。接受自然语言顺序，例如 `PBS → XJ → PB2 → CD34`，并记录为 `group_order`。用户未指定时不必因此暂停，按初始动物表中组别首次出现的顺序输出并在交付时说明。
 - 基线时间点，默认 `D0`。
 - 本批样本是否曾因尾静脉采血量不足而用 PBS 稀释。必须主动确认；若有，取得每个样本的动物编号、时间点、直接校正倍数及适用指标。若没有，明确记录为无稀释。
 
@@ -33,6 +33,7 @@ description: 处理小鼠或其他实验动物血常规分析仪导出的纵向 
 - 重复样本、死亡后仍出现测量、非数值测量和无法解析的日期不得静默选择或删除，必须进入 QC。
 - 样本 ID、笼号和耳标均按文本处理，避免前导零或 Excel 自动转换造成错配。
 - `group_order` 只改变分组汇总和 GraphPad 的组块顺序，不改变组内动物顺序。每只动物在全部时间点始终占用同一重复子列。
+- 用户指定的顺序必须优先于登记表顺序；不得按字母排序，也不得把某一批实验的示例顺序硬编码到其他项目。顺序必须完整且不重复地包含登记表中的全部组；组名不匹配、遗漏或重复时，列出登记表实际组名并请用户修正。
 
 ## 执行
 
@@ -48,9 +49,15 @@ description: 处理小鼠或其他实验动物血常规分析仪导出的纵向 
    python scripts/analyze_hematology.py --config <analysis_config.json> --output-dir <output-folder> --strict
    ```
 
+   若用户希望仅为本次运行指定 GraphPad 从左到右的组序，可使用命令行覆盖配置：
+
+   ```text
+   python scripts/analyze_hematology.py --config <analysis_config.json> --output-dir <output-folder> --group-order "PBS,XJ,PB2,CD34" --strict
+   ```
+
 3. 先检查 `qc_issues.csv`，再解释或制作图表。`ERROR` 表示关键结果不可安全使用；`WARNING` 表示需要披露或人工确认；`INFO` 常用于登记表之外的原始样本或已登记的稀释校正。
 4. 至少手算核对一个普通比例、一个大于 100% 的比例；存在稀释时，再核对至少一个 `raw × factor = corrected` 以及由校正值计算的 `%D0`。同时确认死亡日期边界、D0 缺失/为 0、重复样本和活体缺样的状态正确。
-5. 每个指标都会输出 `<metric>_wide.csv`、`<metric>_copy_ready.csv` 和 `graphpad_<metric>.tsv`。`wide` 保留状态用于审计；`copy_ready` 省略状态列，便于粘贴进用户现有表格；GraphPad TSV 按时间为行、组别为数据集、动物为固定重复子列排列百分比。死亡、缺样、重复和无有效 D0 的位置保持空白。
+5. 每个指标都会输出 `<metric>_wide.csv`、`<metric>_copy_ready.csv` 和 `graphpad_<metric>.tsv`。`wide` 保留状态用于审计；`copy_ready` 省略状态列，便于粘贴进用户现有表格；GraphPad TSV 按时间为行、组别为数据集、动物为固定重复子列排列百分比。死亡、缺样、重复和无有效 D0 的位置保持空白。交付时报告 `run_manifest.json` 中记录的有效 `group_order`。
 6. 用户需要工作簿时，依据 `references/workbook-layout.md` 把 CSV/TSV 输出制作成可审计的 `.xlsx`；用于复制粘贴的指标页可以省略状态列，但 `Long Results`、`QC` 和审计宽表必须保留状态。百分比单元格使用工作簿公式，并进行公式错误扫描和逐表渲染检查。
 
 ## 停止条件
